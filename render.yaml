@@ -1,0 +1,45 @@
+databases:
+  - name: url-shortener-db
+
+services:
+  - type: keyvalue
+    name: url-shortener-redis
+    ipAllowList:
+      - source: 0.0.0.0/0
+        description: allow all (demo project — narrow this if you keep the app running)
+
+  - type: web
+    name: url-shortener-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: url-shortener-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          name: url-shortener-redis
+          type: keyvalue
+          property: connectionString
+      - key: JWT_SECRET
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+
+  - type: web
+    name: url-shortener-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile
+    dockerContext: ./frontend
