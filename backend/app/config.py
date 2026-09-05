@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     google_redirect_uri: str = ""
     frontend_url: str = "http://localhost:5173"
     session_secret: str = "dev-session-secret"
+    public_base_url: str = "http://localhost:8000"
 
     class Config:
         env_file = ".env"
