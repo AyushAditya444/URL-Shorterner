@@ -27,3 +27,19 @@ class LinkOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+class DailyCount(BaseModel):
+    date: str
+    count: int
+
+
+class ReferrerCount(BaseModel):
+    referrer: str | None
+    count: int
+
+
+class AnalyticsOut(BaseModel):
+    total_clicks: int
+    clicks_by_day: list[DailyCount]
+    top_referrers: list[ReferrerCount]

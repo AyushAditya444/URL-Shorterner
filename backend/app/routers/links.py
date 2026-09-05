@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.cache import cache_delete_link, cache_set_link, ttl_for_expiry
 from app.config import settings
 from app.db import get_db
-from app.models import Link, User
+from app.models import Click, Link, User
 from app.rate_limit import rate_limit_dependency
 from app.redis_client import get_redis
-from app.schemas import LinkCreate, LinkOut
+from app.schemas import AnalyticsOut, LinkCreate, LinkOut
 from app.security import get_current_user, get_current_user_optional
 from app.shortcode import generate_code
 
@@ -93,3 +94,33 @@ def delete_link(
     cache_delete_link(redis_client, link.code)
     db.delete(link)
     db.commit()
+
+
+@router.get("/{link_id}/analytics", response_model=AnalyticsOut)
+def link_analytics(link_id: int, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    link = db.query(Link).filter(Link.id == link_id, Link.owner_id == user.id).first()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    total_clicks = db.query(func.count(Click.id)).filter(Click.link_id == link.id).scalar()
+
+    by_day_rows = (
+        db.query(func.date(Click.clicked_at), func.count(Click.id))
+        .filter(Click.link_id == link.id)
+        .group_by(func.date(Click.clicked_at))
+        .order_by(func.date(Click.clicked_at))
+        .all()
+    )
+    clicks_by_day = [{"date": str(day), "count": count} for day, count in by_day_rows]
+
+    top_referrer_rows = (
+        db.query(Click.referrer, func.count(Click.id).label("count"))
+        .filter(Click.link_id == link.id)
+        .group_by(Click.referrer)
+        .order_by(func.count(Click.id).desc())
+        .limit(5)
+        .all()
+    )
+    top_referrers = [{"referrer": referrer, "count": count} for referrer, count in top_referrer_rows]
+
+    return AnalyticsOut(total_clicks=total_clicks, clicks_by_day=clicks_by_day, top_referrers=top_referrers)
