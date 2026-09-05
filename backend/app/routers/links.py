@@ -2,14 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.cache import cache_set_link, ttl_for_expiry
+from app.cache import cache_delete_link, cache_set_link, ttl_for_expiry
 from app.config import settings
 from app.db import get_db
 from app.models import Link, User
 from app.rate_limit import rate_limit_dependency
 from app.redis_client import get_redis
 from app.schemas import LinkCreate, LinkOut
-from app.security import get_current_user_optional
+from app.security import get_current_user, get_current_user_optional
 from app.shortcode import generate_code
 
 router = APIRouter(prefix="/api/links", tags=["links"])
@@ -72,3 +72,24 @@ def create_link(
     if ttl > 0:
         cache_set_link(redis_client, link.code, link.target_url, link.id, ttl_seconds=ttl)
     return _to_out(link)
+
+
+@router.get("", response_model=list[LinkOut])
+def list_my_links(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    links = db.query(Link).filter(Link.owner_id == user.id).order_by(Link.created_at.desc()).all()
+    return [_to_out(link) for link in links]
+
+
+@router.delete("/{link_id}", status_code=204)
+def delete_link(
+    link_id: int,
+    db: Session = Depends(get_db),
+    redis_client=Depends(get_redis),
+    user: User = Depends(get_current_user),
+):
+    link = db.query(Link).filter(Link.id == link_id, Link.owner_id == user.id).first()
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    cache_delete_link(redis_client, link.code)
+    db.delete(link)
+    db.commit()
