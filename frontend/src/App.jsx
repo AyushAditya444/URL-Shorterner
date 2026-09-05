@@ -1,6 +1,7 @@
 import { Routes, Route, Link as RouterLink } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext.jsx'
 import Home from './pages/Home.jsx'
+import Dashboard from './pages/Dashboard.jsx'
 import LoginButton from './components/LoginButton.jsx'
 import RequireAuth from './components/RequireAuth.jsx'
 
@@ -21,7 +22,7 @@ export default function App() {
           path="/dashboard"
           element={
             <RequireAuth>
-              <Placeholder label="Dashboard coming in Task 16" />
+              <Dashboard />
             </RequireAuth>
           }
         />
