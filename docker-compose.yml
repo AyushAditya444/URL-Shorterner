@@ -13,12 +13,15 @@ services:
     ports: ["6379:6379"]
   backend:
     build: ./backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     env_file: .env
     ports: ["8000:8000"]
     volumes: ["./backend:/app"]
     depends_on: [postgres, redis]
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      target: dev
     ports: ["5173:5173"]
     volumes: ["./frontend:/app", "/app/node_modules"]
     depends_on: [backend]
