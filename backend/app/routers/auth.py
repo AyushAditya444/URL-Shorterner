@@ -32,7 +32,16 @@ async def google_callback(request: Request, db: Session = Depends(get_db)):
     _, jwt_token = upsert_user_and_issue_token(db, profile)
     db.commit()
     response = RedirectResponse(url=settings.frontend_url)
-    response.set_cookie("access_token", jwt_token, httponly=True, samesite="lax", max_age=7 * 24 * 3600)
+    # samesite="none" (with secure=True, required alongside it) is needed
+    # because the frontend (vercel.app) and backend (onrender.com) are
+    # different sites — any fetch() the frontend makes to the API is a
+    # cross-site request, and browsers only attach samesite="lax"/"strict"
+    # cookies to top-level navigations, never to cross-site fetch/XHR calls
+    # even with credentials: 'include'. Without this, login would appear to
+    # silently fail: the cookie gets set but is never sent back.
+    response.set_cookie(
+        "access_token", jwt_token, httponly=True, samesite="none", secure=True, max_age=7 * 24 * 3600
+    )
     return response
 
 
@@ -44,5 +53,5 @@ def me(user: User = Depends(get_current_user)):
 @router.post("/logout")
 def logout():
     response = RedirectResponse(url=settings.frontend_url)
-    response.delete_cookie("access_token")
+    response.delete_cookie("access_token", httponly=True, samesite="none", secure=True)
     return response
