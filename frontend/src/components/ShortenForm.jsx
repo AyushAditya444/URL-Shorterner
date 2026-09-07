@@ -6,20 +6,30 @@ export default function ShortenForm() {
   const [customAlias, setCustomAlias] = useState('')
   const [result, setResult] = useState(null)
   const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
 
   async function handleSubmit(e) {
     e.preventDefault()
     setError(null)
     setResult(null)
-    const response = await apiFetch('/api/links', {
-      method: 'POST',
-      body: JSON.stringify({ url, custom_alias: customAlias || undefined }),
-    })
-    if (!response.ok) {
-      setError('Something went wrong shortening that URL.')
-      return
+    setLoading(true)
+    try {
+      const response = await apiFetch('/api/links', {
+        method: 'POST',
+        body: JSON.stringify({ url, custom_alias: customAlias || undefined }),
+      })
+      if (!response.ok) {
+        setError('Something went wrong shortening that URL.')
+        return
+      }
+      setResult(await response.json())
+    } catch {
+      // The fetch itself failed (no response at all) — most likely the
+      // backend's free-tier instance is waking up from a cold start.
+      setError('The server is waking up (this can take up to a minute on the free tier) — please try again shortly.')
+    } finally {
+      setLoading(false)
     }
-    setResult(await response.json())
   }
 
   return (
@@ -30,7 +40,7 @@ export default function ShortenForm() {
       <label htmlFor="alias-input">Custom alias (optional)</label>
       <input id="alias-input" value={customAlias} onChange={(e) => setCustomAlias(e.target.value)} />
 
-      <button type="submit">Shorten</button>
+      <button type="submit" disabled={loading}>{loading ? 'Shortening…' : 'Shorten'}</button>
 
       {error && <p role="alert">{error}</p>}
       {result && <p>{result.short_url}</p>}

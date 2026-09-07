@@ -34,4 +34,30 @@ describe('ShortenForm', () => {
       expect(screen.getByText(/something went wrong/i)).toBeInTheDocument()
     })
   })
+
+  it('shows a waking-up message when the request fails at the network level', async () => {
+    global.fetch = vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
+    render(<ShortenForm />)
+    fireEvent.change(screen.getByLabelText(/url to shorten/i), { target: { value: 'https://example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /shorten/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/waking up/i)).toBeInTheDocument()
+    })
+  })
+
+  it('disables the submit button and shows a loading state while the request is in flight', async () => {
+    let resolveFetch
+    global.fetch = vi.fn().mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    render(<ShortenForm />)
+    fireEvent.change(screen.getByLabelText(/url to shorten/i), { target: { value: 'https://example.com' } })
+    fireEvent.click(screen.getByRole('button', { name: /shorten/i }))
+
+    expect(screen.getByRole('button', { name: /shortening/i })).toBeDisabled()
+
+    resolveFetch({ ok: true, json: async () => ({ short_url: 'http://x/abc1234' }) })
+    await waitFor(() => {
+      expect(screen.getByText('http://x/abc1234')).toBeInTheDocument()
+    })
+  })
 })
