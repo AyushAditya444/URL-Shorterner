@@ -1,6 +1,6 @@
 from authlib.integrations.starlette_client import OAuth
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from app.config import settings
@@ -52,6 +52,10 @@ def me(user: User = Depends(get_current_user)):
 
 @router.post("/logout")
 def logout():
-    response = RedirectResponse(url=settings.frontend_url)
+    # A plain JSON response, not a redirect: the frontend calls this via
+    # fetch(), which auto-follows redirects — a redirect back to the
+    # (static, non-API) frontend origin has nothing to serve for a POST
+    # and returns 405, making logout appear to silently do nothing.
+    response = JSONResponse(content={"status": "logged out"})
     response.delete_cookie("access_token", httponly=True, samesite="none", secure=True)
     return response

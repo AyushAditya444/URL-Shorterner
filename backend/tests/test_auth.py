@@ -64,3 +64,23 @@ def test_me_returns_user_when_cookie_present(client, db_session):
     response = client.get("/api/auth/me")
     assert response.status_code == 200
     assert response.json()["email"] == "a@example.com"
+
+
+def test_logout_returns_json_and_clears_cookie(client, db_session):
+    # Regression test: logout must respond with plain JSON, not a redirect.
+    # The frontend calls this via fetch(), and a redirect response gets
+    # auto-followed by the browser back to the (static, non-API) frontend
+    # origin, which has nothing to serve for a POST and returns 405 —
+    # from the frontend's point of view logout silently "does nothing".
+    user = User(email="logout@example.com", name="Logout User", google_sub="logout-sub")
+    db_session.add(user)
+    db_session.flush()
+    client.cookies.set("access_token", create_access_token(user.id))
+
+    response = client.post("/api/auth/logout", follow_redirects=False)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "logged out"}
+    set_cookie = response.headers.get("set-cookie", "")
+    assert "access_token=" in set_cookie
+    assert "max-age=0" in set_cookie.lower()
